@@ -1,15 +1,12 @@
-import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import io
-import base64
 import networkx as nx
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 class FlightNetwork:
+    
 
     def __init__(self):
+        
         self.graph = nx.DiGraph()
 
     def add_nodes_and_edges(
@@ -18,27 +15,28 @@ class FlightNetwork:
         destination_airports: pd.Series,
         distances: pd.Series = None
     ) -> None:
-        """
-        Add nodes and edges.Optionally, distances are included as edge weights.
-        """
         
-        self.graph.add_nodes_from(origin_airports.unique())
-        self.graph.add_nodes_from(destination_airports.unique())
         
+        all_airports = set(origin_airports).union(set(destination_airports))
+        self.graph.add_nodes_from(all_airports)
+
         
         if distances is not None:
-            edges = list(zip(origin_airports, destination_airports, distances))
+            edges = zip(origin_airports, destination_airports, distances)
             for origin, destination, distance in edges:
                 self.graph.add_edge(origin, destination, distance=distance)
         else:
-            edges = list(zip(origin_airports, destination_airports))
+            edges = zip(origin_airports, destination_airports)
             self.graph.add_edges_from(edges)
 
     @property
     def nodes(self) -> List[str]:
-        return list(self.graph.nodes())
+        
+        # Usa il set combinato dei nodi per maggiore robustezza
+        all_airports = set(self.graph.nodes)
+        return list(all_airports)
 
     @property
-    def edges(self) -> List[tuple]:
-        return list(self.graph.edges(data=True))  # Include edge attributes
-
+    def edges(self) -> List[Tuple[str, str, dict]]:
+        
+        return list(self.graph.edges(data=True))
