@@ -1,0 +1,6 @@
+archive_usa_airport/airports_without_coordinates.csv
+archive_usa_airport/Airports2.csv
+archive_usa_airport/flights_final.csv
+*.pyc
+archive_usa_airport/airports_without_coordinates.csv
+*.csv
