@@ -100,6 +100,7 @@ class FlightNetwork:
 
         self.all_shortest_path = all_shortest_path
         return all_shortest_path
+    
 
 
     def analyze_centrality(self, airport: str) -> Dict[str, float]:
@@ -226,3 +227,82 @@ class FlightNetwork:
 
         self.centrality_measure = centrality_df
         return top_airports
+    
+    def dijkstra(self, start: str, end: str) -> Tuple[List[str], float]:
+        """
+        Find the shortest path from start to end using Dijkstra's algorithm.
+
+        Args:
+            start (str): The starting node (airport).
+            end (str): The target node (airport).
+
+        Returns:
+            Tuple[List[str], float]: A tuple containing the path as a list of nodes and the total distance.
+        """
+        # Priority queue to manage the next nodes to explore
+        heap = [(0, start, [start])]  # (distance, current_node, path)
+        visited = set()
+        distances = {node: float('inf') for node in self.graph.nodes}
+        distances[start] = 0
+
+        while heap:
+            current_distance, current_node, path = heapq.heappop(heap)
+
+            # If we reach the destination node, return the path and distance
+            if current_node == end:
+                return path, current_distance
+
+            # Skip this node if it has already been visited
+            if current_node in visited:
+                continue
+
+            # Mark the current node as visited
+            visited.add(current_node)
+
+            # Explore neighbors
+            for neighbor in self.graph.neighbors(current_node):
+                edge_data = self.graph.get_edge_data(current_node, neighbor, default={})
+                weight = edge_data.get('distance', 1)  # Default weight is 1 if not specified
+                new_distance = current_distance + weight
+
+                if new_distance < distances[neighbor]:
+                    distances[neighbor] = new_distance
+                    heapq.heappush(heap, (new_distance, neighbor, path + [neighbor]))
+
+        # If no path was found
+        return "No route found", float('inf')
+
+    def find_best_routes(self, file_path, date, origin_city, destination_city):
+        # Load data and filter
+        df = pd.read_csv(file_path)
+        df['Fly_date'] = pd.to_datetime(df['Fly_date']).dt.date
+        df = df[df['Fly_date'] == pd.to_datetime(date).date()]
+        # Build the graph for the specific day
+        origin = df['Origin_airport']
+        destination = df['Destination_airport']
+        distance = df['Distance']
+
+        self.add_nodes_and_edges(origin, destination , distance)
+
+        # Find best routes between all airport pairs
+        origin_airports = df[df['Origin_city'] == origin_city]['Origin_airport'].unique()
+        destination_airports = df[df['Destination_city'] == destination_city]['Destination_airport'].unique()
+
+        results = []
+        for origin_airport in origin_airports:
+            for destination_airport in destination_airports:
+                path, distance = self.dijkstra(origin_airport, destination_airport)
+                results.append({
+                    'Origin_city_airport': origin_airport,
+                    'Destination_city_airport': destination_airport,
+                    'Best_route': ' → '.join(path) if isinstance(path, list) else "No route found",
+                    'Distance': distance if distance != float('inf') else "No route found"
+                })
+        results_df = pd.DataFrame(results)
+        results_df = results_df.sort_values(by='Distance')
+
+        # Return the top 5 results
+        return results_df.head(5)
+
+
+
