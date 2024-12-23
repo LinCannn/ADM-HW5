@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import io
 import base64
 import networkx as nx
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Set
+from collections import deque
 
 import networkx as nx
 from typing import List, Tuple
@@ -31,10 +32,12 @@ class FlightNetwork:
         if distances is not None:
             edges = list(zip(origin_airports, destination_airports, distances))
             for origin, destination, distance in edges:
-                self.graph.add_edge(origin, destination, distance=distance)
+                self.graph.add_edge(origin, destination, distance=distance,capacity=1)
         else:
             edges = list(zip(origin_airports, destination_airports))
-            self.graph.add_edges_from(edges)
+            for origin, destination, distance in edges:
+                self.graph.add_edge(origin, destination, distance=distance,capacity=1)
+
 
     @property
     def nodes(self) -> List[str]:
@@ -44,77 +47,108 @@ class FlightNetwork:
     def edges(self) -> List[tuple]:
         return list(self.graph.edges(data=True))  # Include edge attributes
 
-    def disconnect_flight_network(self) -> Tuple[List[Tuple[str, str]], Tuple[set, set]]:
+    def bfs(self, residual_graph, source, sink, parent):
         """
-        Finds and removes the minimum number of flights to disconnect the flight network into two subgraphs.
-    
-        Returns:
-            - removed_edges: List of edges removed to disconnect the graph.
-            - partitions: Two sets of nodes representing the two disjoint subgraphs.
+        Executes a BFS to find an augmenting path in the residual graph.
+        Writing this function is a prerequisite for using min_cut.
         """
-        # Convert the directed graph to an undirected graph for min-cut
-        undirected_graph = self.graph.to_undirected()
+        visited = set()
+        queue = deque([source])
+        visited.add(source)
+        parent.clear()
 
-        # Ensure all edges have a finite capacity
-        for u, v in undirected_graph.edges:
-            if 'capacity' not in undirected_graph[u][v]:
-                undirected_graph[u][v]['capacity'] = 1  # Assign a default capacity
-        # Select two arbitrary nodes as source and sink
-        nodes = list(self.graph.nodes)
-        if len(nodes) < 2:
-            raise ValueError("The graph must have at least two nodes to calculate a minimum cut.")
-        s, t = nodes[0], nodes[1]  # Arbitrary choice of source and sink nodes
+        while queue:
+            current = queue.popleft()
+            for neighbor in residual_graph[current]:
+                capacity = residual_graph[current][neighbor]["capacity"]
+                if neighbor not in visited and capacity > 0:
+                    queue.append(neighbor)
+                    visited.add(neighbor)
+                    parent[neighbor] = current
+                    if neighbor == sink:
+                        return True
+        return False
 
-        # Compute the minimum cut
-        cut_value, partition = nx.minimum_cut(undirected_graph, s, t)
-        reachable, non_reachable = partition
+    def min_cut(self, source: str, sink: str):
+        """
+        This manual implementation of min_cut uses the Edmonds-Karp method.
+        It gives back removed edges and nodes partitions.
+        """
+        # Create a copy of the original graph for the residual one
+        residual_graph = nx.DiGraph()
+        for u, v, data in self.graph.edges(data=True):
+            residual_graph.add_edge(u, v, capacity=data["capacity"])
+            if not residual_graph.has_edge(v, u):
+                residual_graph.add_edge(v, u, capacity=0)
 
-        # Identify the edges crossing the cut
+        parent = {}
+        max_flow = 0
+
+        # Step 1: Find te maximum flow
+        while self.bfs(residual_graph, source, sink, parent):
+            # Find the minimum residual capacity over the path
+            path_flow = float("Inf")
+            v = sink
+            while v != source:
+                u = parent[v]
+                path_flow = min(path_flow, residual_graph[u][v]["capacity"])
+                v = u
+
+            # Update the capacities in the residual graph
+            v = sink
+            while v != source:
+                u = parent[v]
+                residual_graph[u][v]["capacity"] -= path_flow
+                residual_graph[v][u]["capacity"] += path_flow
+                v = u
+
+            max_flow += path_flow
+
+        # Step 2: Find the minimum cut
+        visited = set()
+        queue = deque([source])
+        visited.add(source)
+
+        while queue:
+            current = queue.popleft()
+            for neighbor in residual_graph[current]:
+                if neighbor not in visited and residual_graph[current][neighbor]["capacity"] > 0:
+                    queue.append(neighbor)
+                    visited.add(neighbor)
+
+        # Partitions
+        reachable = visited
+        non_reachable = set(self.graph.nodes) - reachable
+
+        # Identify the cut edges
         cut_edges = []
         for u in reachable:
-            for v in self.graph.neighbors(u):
+            for v in self.graph.successors(u):
                 if v in non_reachable:
                     cut_edges.append((u, v))
 
-        # Remove the cut edges from the graph
-        self.graph.remove_edges_from(cut_edges)
-
         return cut_edges, (reachable, non_reachable)
-
-
-    def visualize_graph(self, title: str, partitions: Tuple[set, set] = None) -> None:
-        """
-        Visualizza il grafo con un layout e colorazione opzionale.
     
-        Args:
-        title: Titolo del grafo.
-        partitions: Tuple opzionale contenente due insiemi di nodi da colorare.
+    #FOR RQ4:
+
+    def add_nodes_and_edges2(
+        self,
+        origin_airports: pd.Series,
+        destination_airports: pd.Series
+    ) -> None:
         """
-        import matplotlib.pyplot as plt
+        Add nodes and edges, this time putting capacity=1 by default.
+        """
+        self.graph.add_nodes_from(origin_airports.unique())
+        self.graph.add_nodes_from(destination_airports.unique())
+        
+        edges = list(zip(origin_airports, destination_airports))
+    
+        # Add edges to the graph with capacity = 1
+        for u, v in edges:
+            self.graph.add_edge(u, v, capacity=1)
 
-        plt.figure(figsize=(8, 6))
-        #Usa le distanze come pesi per il layout
-        edge_weights = nx.get_edge_attributes(self.graph, 'distance')
-        pos = nx.spring_layout(self.graph, seed=42, weight='distance') if edge_weights else nx.spring_layout(self.graph, seed=42)
 
-        if partitions:
-            colors = ['red', 'blue']
-            for i, partition in enumerate(partitions):
-                nx.draw_networkx_nodes(self.graph, pos, nodelist=list(partition), node_color=colors[i], alpha=0.8)
-        else:
-            nx.draw_networkx_nodes(self.graph, pos, node_color='lightblue', alpha=0.8)
-
-        # Disegna gli archi
-        nx.draw_networkx_edges(self.graph, pos, edge_color='gray', alpha=0.7)
-
-        # Aggiungi etichette ai nodi
-        nx.draw_networkx_labels(self.graph, pos, font_size=10, font_color='black')
-
-        # Aggiungi le distanze come etichette degli archi
-        edge_labels = nx.get_edge_attributes(self.graph, 'distance')  # Ottieni l'attributo 'distance'
-        nx.draw_networkx_edge_labels(self.graph, pos, edge_labels=edge_labels, font_size=9)
-        plt.title(title)
-        plt.show()
 
 
 
