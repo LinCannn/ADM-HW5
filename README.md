@@ -14,9 +14,9 @@ The project notebook can be visualized via nbviewer: [View Notebook.](https://nb
 
 ## Project Structure
 
-The project is organized into different sections and folders, each serving a specific purpose:
+The project is organized into different sections and folders:
 
-### **Main **
+### **Main File**
 - **[ADM_H5.ipynb](ADM_H5.ipynb)**: Contains the main file for the project analysis.
 
 ### **Additional Folders**
