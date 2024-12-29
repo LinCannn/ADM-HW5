@@ -1,4 +1,5 @@
-
+# IMPORTANT READ HERE !
+The project notebook can be visualized via nbviewer: [View Notebook.](https://nbviewer.org/github/LinCannn/ADM-HW5/blob/main/ADM_H5.ipynb)
 # ADM_HW5
 
 This homework was completed by the collective effort of:
@@ -8,8 +9,6 @@ This homework was completed by the collective effort of:
 - **Emilio Leone**, 2196721
 
 The project focuses on analyzing the Airchive USA airport data retrieved from Kaggle: [Kaggle Dataset](https://www.kaggle.com/datasets/flashgordon/usa-airport-dataset)
-
- **🚨 IMPORTANT! 🚨** :  The project notebook can be visualized via nbviewer: [View Notebook.](https://nbviewer.org/github/LinCannn/ADM-HW5/blob/main/ADM_H5.ipynb)
 
 
 ## Project Structure
